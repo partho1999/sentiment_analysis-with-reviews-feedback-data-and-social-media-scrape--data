@@ -99,7 +99,7 @@ def Twitter(name):
     tweets = tw.Cursor(api.search_tweets, 
                     q                = new_search,
                     result_type      = "mixed",
-                    lang             = "id",
+                    lang             = "en",
                     count            = 100,
                     include_entities = True,
                     since_id         = "2020-01-01").items(500)
@@ -181,6 +181,12 @@ def YouTube(name):
         'Channel':channel_lst,
         'Uploaded':uploaded_lst
         })
+    df=df[df['Description']!='New']
+    df=df[df['Description']!='CC']
+    df=df[df['Description']!='4K']
+    indx=df[df['Duration'] == 'People also watched'].index.values[0]
+    df=df[:df.index.get_loc(indx)]
+
     df.to_csv("youtube.csv", index= False, header= True)
     return df
 
@@ -234,13 +240,9 @@ def Facebook_Posts(name):
     pass_field = wait.until(EC.visibility_of_element_located((By.NAME, 'pass')))
     pass_field.send_keys(PASSWORD)
     pass_field.send_keys(Keys.RETURN)
-
     time.sleep(5)
-
     text=name
-
     browser.get('https://www.facebook.com/search/posts/?q='+ text) # once logged in, free to open up any target page
-
     time.sleep(5)
 
     #scroll down
@@ -262,7 +264,8 @@ def Facebook_Posts(name):
         try:
             Name.append(content.text.split('·')[0])
             Time.append(content.text.split('·')[1])
-            Post.append(content.text.split('·')[2].split('Shared with Public')[1])
+            pst=content.text.split('·')[2].split('Shared with Public')[1].split('Like')[0]
+            Post.append(pst[:-7])
         except:
             continue
 
@@ -275,20 +278,21 @@ def Facebook_Posts(name):
         'Time': Time,
         'Post': Post
         })
-
     #print(df)
-
     df.to_csv("Facebook_post.csv", index=False)
 
     all_photo=soup.find_all("img")
     image_name= text
+    if not os.path.exists('scrape_image/'+image_name):
+        os.makedirs('scrape_image/'+image_name,mode = 0o666)
 
     #print(all_photo)
     i=0
     for photo in all_photo:
         i+=1
         link = photo['src']
-        Name=f'{image_name} {i}.jpg'
+        #Name=f'scrape_image/{image_name}/{image_name} {i}.jpg'
+        Name=f'scrape_image/{image_name}/{image_name} {i}.jpg'
         #print((image_name+{i}).format(i))
         
         with open(Name, 'wb') as f:
@@ -301,9 +305,86 @@ def Facebook_Posts(name):
     return df
 
 
-#if __name__ == "__main__":
+def Facebook_Photo(name):
+    # set options as you wish
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36"
+
+    options = webdriver.ChromeOptions()
+    options.headless = True
+    options.add_argument(f'user-agent={user_agent}')
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument('--allow-running-insecure-content')
+    options.add_argument("--disable-extensions")
+    options.add_argument("--proxy-server='direct://'")
+    options.add_argument("--proxy-bypass-list=*")
+    options.add_argument("--start-maximized")
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--no-sandbox')
+
+    with open('facebook_credentials.txt') as file:
+        EMAIL = file.readline().split('"')[1]
+        PASSWORD = file.readline().split('"')[1]
+    
+
+    #print(PASSWORD)
+        
+    browser = webdriver.Chrome(executable_path="chromedriver.exe", options=options)
+    browser.get("http://facebook.com")
+    browser.maximize_window()
+    wait = WebDriverWait(browser, 30)
+    email_field = wait.until(EC.visibility_of_element_located((By.NAME, 'email')))
+    email_field.send_keys(EMAIL)
+    pass_field = wait.until(EC.visibility_of_element_located((By.NAME, 'pass')))
+    pass_field.send_keys(PASSWORD)
+    pass_field.send_keys(Keys.RETURN)
+    time.sleep(5)
+    text=name
+    browser.get('https://www.facebook.com/search/posts/?q='+ text) # once logged in, free to open up any target page
+    time.sleep(5)
+
+    #scroll down
+    #increase the range to sroll more
+    #example: range(0,10) scrolls down 650+ images
+    for j in range(0,10):
+        browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(5)
+
+    time.sleep(5)
+
+    soup=BeautifulSoup(browser.page_source,"html.parser")
+    all_posts=soup.find_all("div",{"class":"rq0escxv l9j0dhe7 du4w35lb hybvsw6c io0zqebd m5lcvass fbipl8qg nwvqtn77 k4urcfbm ni8dbmo4 stjgntxs sbcfpzgs"})
+    browser.quit()
+   
+    all_photo=soup.find_all("img")
+    image_name= text
+    if not os.path.exists('scrape_image/'+image_name):
+        os.makedirs('scrape_image/'+image_name,mode = 0o666)
+
+    #print(all_photo)
+    i=0
+    for photo in all_photo:
+        i+=1
+        link = photo['src']
+        #Name=f'scrape_image/{image_name}/{image_name} {i}.jpg'
+        Name=f'scrape_image/{image_name}/{image_name} {i}.jpg'
+        #print((image_name+{i}).format(i))
+        
+        with open(Name, 'wb') as f:
+            try:
+                img = requests.get(link)
+                f.write(img.content)
+            except:
+                continue
+
+    return '200'
+
+
+if __name__ == "__main__":
 #     google("covid")
 #     twitter("covid")
 #     youtube("covid")
 #     Facebook("Shaon.ComputerGeek")
 #     Facebook_Posts("opus technology limited")
+     Facebook_Photo("opus technology limited")
